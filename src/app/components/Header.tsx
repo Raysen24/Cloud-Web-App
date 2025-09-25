@@ -58,8 +58,9 @@ export default function Header(){
               background:'transparent',
               cursor:'pointer',
               fontSize:20,
-              zIndex:110, // 👈 ensures it stays above the sidebar
-              position:'relative'
+              zIndex:110,
+              position:'relative',
+              color: 'var(--text)'
             }}
           >
             ☰
