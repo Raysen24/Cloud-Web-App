@@ -55,10 +55,9 @@ export default function TabsBuilderPage() {
   }
 
   function generateOutputHTML(tabsArr: TabItem[]) {
-    // safe JSON for embedding
-    const json = JSON.stringify(tabsArr).replace(/</g, '\\u003c');
+  const json = JSON.stringify(tabsArr).replace(/</g, '\\u003c');
 
-    const html = `<!doctype html>
+  const html = `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -92,17 +91,14 @@ export default function TabsBuilderPage() {
         btn.style.cursor = 'pointer';
         btn.style.background = i===active ? '#0f62fe' : '#fff';
         btn.style.color = i===active ? '#fff' : '#111';
-        btn.setAttribute('role','tab');
-        btn.setAttribute('aria-selected', String(i === active));
         btn.onclick = function(){ active = i; render(); };
-        btn.onkeydown = function(e){ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); active = i; render(); } };
         containerButtons.appendChild(btn);
       });
 
       const current = tabs[active] || {title:'', content:''};
-      containerContent.innerHTML = '<h3 style="margin-top:0; margin-bottom:8px;">' + sanitizeHTML(current.title) + '</h3>' 
-         + '<div>' + current.content + '</div>';
-      containerContent.setAttribute('role','tabpanel');
+      const safeContent = (current.content || '').replace(/\\n/g, '<br>');
+      containerContent.innerHTML = '<h3>' + sanitizeHTML(current.title) + '</h3>' 
+         + '<div>' + safeContent + '</div>';
     }
 
     render();
@@ -110,8 +106,8 @@ export default function TabsBuilderPage() {
   </script>
 </body>
 </html>`;
-    return html;
-  }
+  return html;
+}
 
   function onGenerate() {
     const html = generateOutputHTML(tabs);
@@ -119,13 +115,11 @@ export default function TabsBuilderPage() {
   }
 
   async function copyOutput() {
-    if (!outputHtml) {
-      onGenerate();
-    }
+    if (!outputHtml) onGenerate();
     try {
       await navigator.clipboard.writeText(outputHtml || generateOutputHTML(tabs));
       alert('HTML copied to clipboard. Paste into Hello.html and open in a browser.');
-    } catch (e) {
+    } catch {
       alert('Copy failed — you can use the text area to copy manually.');
     }
   }
@@ -141,58 +135,68 @@ export default function TabsBuilderPage() {
     <div>
       <h1>Tabs Builder (Assignment 1)</h1>
 
-      <div style={{display:'flex', gap:12, alignItems:'center', marginBottom:12}}>
-        <button onClick={addTab} aria-label="Add tab">+ Add tab</button>
-        <button onClick={() => { if (confirm('Clear local storage?')) { localStorage.removeItem(STORAGE_KEY); setTabs([{ id: uid('t_'), title: 'Tab 1', content: 'Content for tab 1' }]); setActiveIndex(0); }}}>Reset</button>
-        <div style={{marginLeft: 'auto'}}>Stored in localStorage</div>
+      <div style={{display:'flex', gap:20, alignItems:'center', marginBottom:12}}>
+        <button onClick={addTab}>+ Add tab</button>
+        <button onClick={() => { 
+          if (confirm('Clear local storage?')) { 
+            localStorage.removeItem(STORAGE_KEY); 
+            setTabs([{ id: uid('t_'), title: 'Tab 1', content: 'Content for tab 1' }]); 
+            setActiveIndex(0); 
+          }}}>Reset</button>
+        <div style={{marginLeft:'auto'}}>Stored in localStorage</div>
       </div>
 
-      <div style={{display:'flex', gap:20}}>
-        <div style={{flex:1, minWidth:280}}>
+      {/* 3-column layout */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 2fr 2fr', gap:20}}>
+        
+        {/* Left: Tabs list (rename + remove) */}
+        <div>
           <h3>Tabs</h3>
           <ul style={{listStyle:'none', padding:0}}>
             {tabs.map((t, i) => (
               <li key={t.id} style={{marginBottom:8, padding:8, border: i===activeIndex ? '1px solid var(--accent)' : '1px solid #eee', borderRadius:6}}>
                 <div style={{display:'flex', gap:8, alignItems:'center'}}>
-                  <input aria-label={`Tab ${i+1} title`} value={t.title} onChange={e => updateTab(i, { title: e.target.value })} />
-                  <button onClick={() => setActiveIndex(i)} aria-label={`Select tab ${i+1}`}>Select</button>
-                  <button onClick={() => removeTab(i)} aria-label={`Remove tab ${i+1}`}>-</button>
-                </div>
-                <div style={{marginTop:8}}>
-                  <label style={{display:'block', marginBottom:6}}>Content (HTML allowed)</label>
-                  <textarea aria-label={`Tab ${i+1} content`} value={t.content} onChange={e => updateTab(i, { content: e.target.value })} style={{width:'100%', minHeight:80}} />
+                  <input value={t.title} onChange={e => updateTab(i, { title: e.target.value })} />
+                  <button onClick={() => setActiveIndex(i)}>Select</button>
+                  <button onClick={() => removeTab(i)}>-</button>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <div style={{flex:1}}>
-          <h3>Preview</h3>
+        {/* Middle: Preview with live editable content */}
+        <div>
+          <h3>Preview & Edit</h3>
           <div style={{border:'1px solid #ddd', padding:12, borderRadius:8}}>
             <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:12}}>
               {tabs.map((t, i) => (
-                <button key={t.id} onClick={() => setActiveIndex(i)} style={{padding:'8px 12px', background: i===activeIndex ? 'var(--accent)' : '#fff', color: i===activeIndex ? '#fff' : '#111', borderRadius:6}} aria-pressed={i===activeIndex}>
+                <button key={t.id} onClick={() => setActiveIndex(i)} style={{padding:'8px 12px', background: i===activeIndex ? 'var(--accent)' : '#fff', color: i===activeIndex ? '#fff' : '#111', borderRadius:6}}>
                   {t.title}
                 </button>
               ))}
             </div>
             <div style={{padding:12, border:'1px solid #eee', borderRadius:6}}>
-              <h4 style={{marginTop:0}}>{tabs[activeIndex]?.title}</h4>
-              <div dangerouslySetInnerHTML={{__html: tabs[activeIndex]?.content || ''}} />
+              <h4>{tabs[activeIndex]?.title}</h4>
+              <textarea
+                style={{width:'100%', minHeight:120}}
+                value={tabs[activeIndex]?.content}
+                onChange={e => updateTab(activeIndex, { content: e.target.value })}
+              />
             </div>
           </div>
+        </div>
 
-          <div style={{marginTop:12}}>
-            <button onClick={onGenerate}>Generate HTML</button>
-            <button onClick={copyOutput} style={{marginLeft:8}}>Copy HTML</button>
-            <button onClick={openInNewTab} style={{marginLeft:8}}>Open generated HTML</button>
+        {/* Right: Buttons + output code */}
+        <div>
+          <h3>Output</h3>
+          <div style={{marginBottom:12}}>
+            <button onClick={onGenerate}>Generate Code</button>
+            <button onClick={copyOutput} style={{marginLeft:2}}>Copy Code</button>
+            <button onClick={openInNewTab} style={{marginLeft:2}}>Open Generated Code</button>
           </div>
-
-          <div style={{marginTop:12}}>
-            <label>Generated HTML (copy/paste into Hello.html)</label>
-            <textarea readOnly value={outputHtml} style={{width:'100%', minHeight:220, whiteSpace:'pre-wrap'}} />
-          </div>
+          <label>Generated HTML (copy/paste into Hello.html)</label>
+          <textarea readOnly value={outputHtml} style={{width:'100%', minHeight:200, whiteSpace:'pre-wrap'}} />
         </div>
       </div>
     </div>
