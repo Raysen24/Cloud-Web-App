@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div>
@@ -7,7 +9,8 @@ export default function Home() {
       </p>
 
       <p>
-        <a href="/tabs">Open the Tabs builder →</a>
+        {/* ✅ Use Link instead of <a> */}
+        <Link href="/tabs">Open the Tabs builder →</Link>
       </p>
     </div>
   );
