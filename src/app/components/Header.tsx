@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
 import React, { useEffect, useState } from 'react'
+import { usePathname } from "next/navigation";
+
 
 const COOKIE_KEY = 'cwa_active_menu';
 const STUDENT_NUMBER = '22586621';
@@ -19,6 +21,15 @@ export default function Header(){
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<'light'|'dark'>('light');
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Always sync cookie + state with current pathname
+    if (pathname) {
+      setCookie(COOKIE_KEY, pathname);
+      setActiveMenu(pathname);
+    }
+  }, [pathname]);
 
   useEffect(()=> {
     const c = getCookie(COOKIE_KEY);

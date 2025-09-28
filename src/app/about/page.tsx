@@ -5,12 +5,48 @@ export default function About() {
       <p>Name: WINATA ADITYA RAYSEN SUSANTO</p>
       <p>Student number (La Trobe Student ID): 22586621</p>
 
-      <h3>Demo Video (put your recorded video file in /public/demo.mp4)</h3>
-      <video controls width={640} aria-label="Usage demo">
-        <source src="/demo.mp4" type="video/mp4" />
-        Your browser does not support the video element.
-      </video>
-      <p>Provide captions and a short transcript under the video (accessibility).</p>
+      {/* Demo Video */}
+      <h3>Demo Video</h3>
+      <iframe
+        src="https://drive.google.com/file/d/1DayKbGdx8NR8vZ1drMBPTT9YuAz07lmM/preview"
+        width="640"
+        height="360"
+        allow="autoplay"
+        title="Demo Video"
+        style={{ border: "none" }}
+      ></iframe>
+      <p>
+        If the video looks blurry or doesn’t load,{" "}
+        <a
+          href="https://drive.google.com/file/d/1DayKbGdx8NR8vZ1drMBPTT9YuAz07lmM/view?usp=sharing"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          click here to open directly in Google Drive
+        </a>.
+      </p>
+      <p>Enable CC subtitles in Google Drive for captions and transcript.</p>
+
+      {/* Assignment Video */}
+      <h3>Assignment Video (Code & Grading Criteria Explanation)</h3>
+      <iframe
+        src="https://drive.google.com/file/d/1DayKbGdx8NR8vZ1drMBPTT9YuAz07lmM/preview"
+        width="640"
+        height="360"
+        allow="autoplay"
+        title="Assignment Video"
+        style={{ border: "none" }}
+      ></iframe>
+      <p>
+        Looks blurry?{" "}
+        <a
+          href="https://drive.google.com/file/d/1DayKbGdx8NR8vZ1drMBPTT9YuAz07lmM/view?usp=sharing"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Watch directly on Google Drive
+        </a>.
+      </p>
     </div>
   );
 }
