@@ -85,3 +85,362 @@ body{
 .hamburger[aria-expanded="true"] .bars::after{
   transform: rotate(-90deg);
 }
+
+/* ---------- Escape room HUD / layout ---------- */
+
+.escape-root {
+  position: relative;
+  min-height: 640px;
+  margin: 24px auto;
+  padding-bottom: 16px;
+  width: min(1200px, 100% - 48px);
+  /* background-image: url('/escape/escape_root_bg.png'); */
+  background-size: cover;
+  background-position: center;
+  background-color: #020617;
+  border-radius: 32px;
+  box-shadow: 0 32px 80px rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.escape-hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+  backdrop-filter: blur(10px);
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.9),
+    rgba(15, 23, 42, 0.6)
+  );
+  /* border: 10px solid red; */
+}
+
+.escape-main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr);
+  gap: 12px;
+  padding: 12px;
+  flex-grow: 1;
+}
+
+.escape-meta {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.escape-timer {
+  text-align: right;
+}
+
+.escape-timer-label {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.escape-timer-bar {
+  width: 200px;
+  height: 8px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 999px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.escape-timer-fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.escape-room-card,
+.escape-editor-card {
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.9);
+}
+
+/* neon border + soft glow */
+.hud-card {
+  border: 1px solid rgba(59, 130, 246, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.9),
+    0 0 30px rgba(37, 99, 235, 0.35);
+}
+
+/* subtle animated scanlines overlay */
+.hud-scanlines {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(15, 23, 42, 0.6) 0,
+    rgba(15, 23, 42, 0.1) 1px,
+    transparent 2px
+  );
+  background-size: 100% 4px;
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+  animation: hud-scan 4s linear infinite;
+}
+
+@keyframes hud-scan {
+  0% {
+    background-position-y: 0;
+  }
+  100% {
+    background-position-y: 4px;
+  }
+}
+
+/* ROOM IMAGE */
+
+.escape-room-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: brightness(0.9);
+}
+
+/* Hotspot icons */
+
+.escape-hotspot-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* Progress pill */
+
+.escape-progress-pill {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  font-size: 12px;
+}
+
+/* Editor side */
+
+.escape-editor-card {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.escape-editor-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.escape-editor-header p {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.escape-editor-status {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.escape-editor-flex {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* Code editor */
+
+.escape-code-wrapper {
+  position: relative;
+  flex-grow: 1;
+  min-height: 200px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.escape-code-header {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(30, 64, 175, 0.6);
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.escape-code-theme {
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.escape-code-textarea {
+  flex-grow: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono';
+  font-size: 13px;
+  background: transparent;
+  color: inherit;
+}
+
+/* Buttons */
+
+.escape-btn-primary {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #22c55e;
+  color: #022c22;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.escape-btn-secondary {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.7);
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.escape-btn-circle {
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: #020617;
+  color: #e5e7eb;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* Controls row */
+
+.escape-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.escape-controls-left {
+  display: flex;
+  gap: 8px;
+}
+
+/* Console */
+
+.escape-console {
+  position: relative;
+  border-radius: 12px;
+  border: 1px solid rgba(75, 85, 99, 0.9);
+  padding: 8px;
+  max-height: 160px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono';
+  font-size: 11px;
+  color: #e5e7eb;
+}
+
+.escape-last-message {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* Hint overlay */
+
+.escape-hint-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: radial-gradient(circle at top, rgba(15, 23, 42, 0.94), rgba(15, 23, 42, 0.96));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.escape-hint-card {
+  max-width: 640px;             /* smaller, consistent width */
+  width: 90%;
+  padding: 16px;
+  border-radius: 16px;
+  background: #020617;
+  position: relative;
+}
+
+.escape-hint-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.escape-hint-image-wrapper {
+  position: relative;
+  margin: 8px 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(55, 65, 81, 0.9);
+  max-height: 360px;           /* cap height */
+}
+
+.escape-hint-image {
+  width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  display: block;
+  background: #020617;
+}
+
+/* Small-screen stacking */
+
+@media (max-width: 900px) {
+  .escape-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.escape-end-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+    circle at top,
+    rgba(15, 23, 42, 0.95),
+    rgba(15, 23, 42, 0.98)
+  );
+}
+
+.escape-end-card {
+  max-width: 420px;
+  width: 90%;
+  padding: 20px 24px;
+  border-radius: 16px;
+  background: #020617;
+  text-align: center;
+}

@@ -1,3 +1,7 @@
+'use client';
+import React from 'react';
+import GameShell from '../components/escape/Gameshell';
+
 export default function EscapeRoomPage() {
-  return <h1>Escape Room (Coming Soon)</h1>;
+  return <GameShell />;
 }
