@@ -1,0 +1,13 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="1"></stop>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#020617"></rect>
+  <circle cx="32" cy="32" r="26" fill="url(#eyeGlow)" opacity="0.7"></circle>
+  <path d="M8 32c4.5-7 12-14 24-14s19.5 7 24 14c-4.5 7-12 14-24 14S12.5 39 8 32z" fill="none" stroke="#38bdf8" stroke-width="2"></path>
+  <circle cx="32" cy="32" r="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2"></circle>
+  <circle cx="32" cy="32" r="3" fill="#e5faff"></circle>
+</svg>
