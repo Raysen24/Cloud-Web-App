@@ -39,6 +39,12 @@ type RoomConfig = {
   };
 };
 
+type RoomState = {
+  editorCode: string;
+  consoleLines: string[];
+  puzzleConnected: boolean;
+};
+
 const ROOMS: RoomConfig[] = [
   {
     id: 'room1',
@@ -146,9 +152,9 @@ const difficultySettings: Record<
   Difficulty,
   { time: number; hints: number }
 > = {
-  easy: { time: 20 * 60, hints: 6 },
-  medium: { time: 15 * 60, hints: 3 },
-  hard: { time: 10 * 60, hints: 0 },
+  easy: { time: 10 * 60, hints: 6 },
+  medium: { time: 8 * 60, hints: 3 },
+  hard: { time: 5 * 60, hints: 0 },
 };
 
 type ValidationResult = {
@@ -157,10 +163,7 @@ type ValidationResult = {
   consoleLines: string[];
 };
 
-function validateCode(
-  room: RoomConfig,
-  code: string
-): ValidationResult {
+function validateCode(room: RoomConfig, code: string): ValidationResult {
   const trimmed = code.trim();
 
   switch (room.puzzleType) {
@@ -196,8 +199,7 @@ function validateCode(
     case 'debug': {
       const hasEvenCheck =
         trimmed.includes('% 2 === 0') || trimmed.includes('%2===0');
-      const hasLoop =
-        trimmed.includes('for') || trimmed.includes('while');
+      const hasLoop = trimmed.includes('for') || trimmed.includes('while');
 
       if (hasEvenCheck && hasLoop) {
         return {
@@ -223,8 +225,7 @@ function validateCode(
     }
 
     case 'generator': {
-      const mentionsLoop =
-        trimmed.includes('for') || trimmed.includes('while');
+      const mentionsLoop = trimmed.includes('for') || trimmed.includes('while');
       const mentionsBounds =
         trimmed.includes('<= 1000') || trimmed.includes('<=1000');
       const mentionsStart =
@@ -312,7 +313,6 @@ function validateCode(
     }
 
     case 'final': {
-      // Require a real escape() implementation that returns "ESCAPED"
       const hasEscapeFn = trimmed.includes('escape');
       const returnsEscaped = trimmed.toUpperCase().includes('ESCAPED');
 
@@ -348,10 +348,7 @@ function validateCode(
   }
 }
 
-function hotspotStyle(
-  leftPerc: number,
-  topPerc: number
-): React.CSSProperties {
+function hotspotStyle(leftPerc: number, topPerc: number): React.CSSProperties {
   return {
     position: 'absolute',
     left: `${leftPerc}%`,
@@ -371,6 +368,29 @@ function hotspotStyle(
   };
 }
 
+function baseConsoleLines(): string[] {
+  return [
+    '// Click the eye icon in the room to view a holographic hint.',
+    '// Then click the gear icon to connect the puzzle to this editor.',
+  ];
+}
+
+function createInitialRoomStates(): Record<RoomId, RoomState> {
+  const baseState: RoomState = {
+    editorCode: '',
+    consoleLines: baseConsoleLines(),
+    puzzleConnected: false,
+  };
+  return {
+    room1: { ...baseState },
+    room2: { ...baseState },
+    room3: { ...baseState },
+    room4: { ...baseState },
+    room5: { ...baseState },
+    room6: { ...baseState },
+  };
+}
+
 export default function GameShell() {
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -384,18 +404,17 @@ export default function GameShell() {
 
   const [showHint, setShowHint] = useState(false);
 
-  const [editorCode, setEditorCode] = useState('');
-  const [puzzleConnected, setPuzzleConnected] = useState(false);
-  const [consoleLines, setConsoleLines] = useState<string[]>([
-    '// Click the eye icon in the room to view a holographic hint.',
-    '// Then click the gear icon to connect the puzzle to this editor.',
-  ]);
+  const [roomStates, setRoomStates] = useState<Record<RoomId, RoomState>>(
+    () => createInitialRoomStates()
+  );
+
   const [lastMessage, setLastMessage] = useState<string | null>(null);
 
   const [muted, setMuted] = useState(false);
   const sound = useMemo(() => new SoundManager(), []);
 
-  // theme detection to match your global light/dark mode
+  const [sessionRecorded, setSessionRecorded] = useState(false);
+
   const [codeTheme, setCodeTheme] = useState<'light' | 'dark'>('dark');
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -409,29 +428,115 @@ export default function GameShell() {
     return () => observer.disconnect();
   }, []);
 
-  // initialise game when difficulty selected
-  useEffect(() => {
-    if (!difficulty) return;
-    const { time, hints } = difficultySettings[difficulty];
-    setTimeLeft(time);
+  const currentRoom = ROOMS[currentRoomIndex];
+  const currentState = roomStates[currentRoom.id];
+
+  const solvedCount = ROOMS.filter((r) => solvedRooms[r.id]).length;
+  const totalRooms = ROOMS.length;
+  const gameFinished = solvedCount >= totalRooms || timeLeft <= 0;
+
+  // NEW: start a completely fresh game
+  function startNewGame(level: Difficulty) {
+    const { time, hints } = difficultySettings[level];
+    setDifficulty(level);
     setBaseTime(time);
+    setTimeLeft(time);
     setHintsLeft(hints);
     setCurrentRoomIndex(0);
     setSolvedRooms({} as Record<RoomId, boolean>);
     setShowHint(false);
-    setPuzzleConnected(false);
-    setEditorCode('');
-    setConsoleLines([
-      '// Welcome to Coding Escape.',
-      '// Use the holographic icons in the room to find clues and connect puzzles.',
-    ]);
+    setRoomStates(createInitialRoomStates());
     setLastMessage(null);
-  }, [difficulty]);
+    setSessionRecorded(false);
+  }
+
+  // NEW: handle resume from saved state
+  function handleResume(save: any) {
+    const diff = (save.difficulty ?? 'easy') as Difficulty;
+    const { time, hints } = difficultySettings[diff];
+
+    // solved rooms
+    const rawSolved = (save.solvedRooms || {}) as Record<string, boolean>;
+    const mappedSolved: Record<RoomId, boolean> = {
+      room1: !!rawSolved.room1,
+      room2: !!rawSolved.room2,
+      room3: !!rawSolved.room3,
+      room4: !!rawSolved.room4,
+      room5: !!rawSolved.room5,
+      room6: !!rawSolved.room6,
+    };
+
+    // room states
+    const fromServer = (save.roomStates || {}) as Record<
+      string,
+      Partial<RoomState>
+    >;
+    const base = createInitialRoomStates();
+    const merged: Record<RoomId, RoomState> = {
+      room1: {
+        ...base.room1,
+        ...(fromServer.room1 as any),
+        consoleLines:
+          (fromServer.room1?.consoleLines as string[] | undefined) ??
+          base.room1.consoleLines,
+      },
+      room2: {
+        ...base.room2,
+        ...(fromServer.room2 as any),
+        consoleLines:
+          (fromServer.room2?.consoleLines as string[] | undefined) ??
+          base.room2.consoleLines,
+      },
+      room3: {
+        ...base.room3,
+        ...(fromServer.room3 as any),
+        consoleLines:
+          (fromServer.room3?.consoleLines as string[] | undefined) ??
+          base.room3.consoleLines,
+      },
+      room4: {
+        ...base.room4,
+        ...(fromServer.room4 as any),
+        consoleLines:
+          (fromServer.room4?.consoleLines as string[] | undefined) ??
+          base.room4.consoleLines,
+      },
+      room5: {
+        ...base.room5,
+        ...(fromServer.room5 as any),
+        consoleLines:
+          (fromServer.room5?.consoleLines as string[] | undefined) ??
+          base.room5.consoleLines,
+      },
+      room6: {
+        ...base.room6,
+        ...(fromServer.room6 as any),
+        consoleLines:
+          (fromServer.room6?.consoleLines as string[] | undefined) ??
+          base.room6.consoleLines,
+      },
+    };
+
+    setDifficulty(diff);
+    setBaseTime(time);
+    setTimeLeft(
+      typeof save.timeLeft === 'number' && save.timeLeft > 0
+        ? save.timeLeft
+        : time
+    );
+    setHintsLeft(hints); // if you want to persist hints, you can store & load them too
+    setCurrentRoomIndex(save.currentRoom ?? 0);
+    setSolvedRooms(mappedSolved);
+    setRoomStates(merged);
+    setShowHint(false);
+    setSessionRecorded(false);
+    setLastMessage('Resumed last run.');
+  }
 
   // timer countdown
   useEffect(() => {
     if (!difficulty) return;
-    if (timeLeft <= 0) return;
+    if (gameFinished) return;
 
     const id = window.setInterval(() => {
       setTimeLeft((prev) => {
@@ -445,7 +550,7 @@ export default function GameShell() {
     }, 1000);
 
     return () => window.clearInterval(id);
-  }, [difficulty, timeLeft, sound]);
+  }, [difficulty, gameFinished, sound]);
 
   // control audio based on mute + game running
   useEffect(() => {
@@ -469,10 +574,6 @@ export default function GameShell() {
     };
   }, [sound]);
 
-  const currentRoom = ROOMS[currentRoomIndex];
-  const solvedCount = ROOMS.filter((r) => solvedRooms[r.id]).length;
-  const totalRooms = ROOMS.length;
-
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
   const timePercent = baseTime
@@ -486,23 +587,6 @@ export default function GameShell() {
   function handleEyeClick() {
     sound.playClick();
     setShowHint(true);
-  }
-
-  function connectPuzzle() {
-    if (!currentRoom) return;
-    setPuzzleConnected(true);
-    const starter = getStarterCode(currentRoom);
-    setEditorCode(starter);
-    setConsoleLines((prev) => [
-      ...prev,
-      '',
-      `// Connected puzzle for ${currentRoom.title}`,
-    ]);
-  }
-
-  function handleGearClick() {
-    sound.playClick();
-    connectPuzzle();
   }
 
   function getStarterCode(room: RoomConfig): string {
@@ -559,27 +643,62 @@ function escape(): string {
     }
   }
 
+  function connectPuzzle() {
+    if (!currentRoom) return;
+    sound.playClick();
+    setRoomStates((prev) => ({
+      ...prev,
+      [currentRoom.id]: {
+        ...prev[currentRoom.id],
+        editorCode: getStarterCode(currentRoom),
+        puzzleConnected: true,
+        consoleLines: [
+          ...prev[currentRoom.id].consoleLines,
+          '',
+          `// Connected puzzle for ${currentRoom.title}`,
+        ],
+      },
+    }));
+    setLastMessage(`Connected puzzle for ${currentRoom.title}.`);
+  }
+
+  function handleGearClick() {
+    connectPuzzle();
+  }
+
   function runCode() {
     if (!currentRoom) return;
     sound.playClick();
 
-    if (!puzzleConnected) {
-      setConsoleLines((prev) => [
+    if (!currentState.puzzleConnected) {
+      setRoomStates((prev) => ({
         ...prev,
-        '',
-        '// Connect the puzzle first (gear icon in the room).',
-      ]);
+        [currentRoom.id]: {
+          ...prev[currentRoom.id],
+          consoleLines: [
+            ...prev[currentRoom.id].consoleLines,
+            '',
+            '// Connect the puzzle first (gear icon in the room).',
+          ],
+        },
+      }));
       setLastMessage('Connect the puzzle first using the gear icon.');
       return;
     }
 
-    const result = validateCode(currentRoom, editorCode);
-    setConsoleLines((prev) => [
+    const result = validateCode(currentRoom, currentState.editorCode);
+    setRoomStates((prev) => ({
       ...prev,
-      '',
-      `// Executing ${currentRoom.title}`,
-      ...result.consoleLines,
-    ]);
+      [currentRoom.id]: {
+        ...prev[currentRoom.id],
+        consoleLines: [
+          ...prev[currentRoom.id].consoleLines,
+          '',
+          `// Executing ${currentRoom.title}`,
+          ...result.consoleLines,
+        ],
+      },
+    }));
     setLastMessage(result.message);
 
     if (result.ok) {
@@ -603,16 +722,28 @@ function escape(): string {
     if (currentRoomIndex < ROOMS.length - 1) {
       const nextIndex = currentRoomIndex + 1;
       setCurrentRoomIndex(nextIndex);
-      setPuzzleConnected(false);
-      setEditorCode('');
       setLastMessage(null);
-      setConsoleLines((prev) => [
+      setRoomStates((prev) => ({
         ...prev,
-        '',
-        `// Entered ${ROOMS[nextIndex].title}`,
-        '// Use the eye icon for a hint; gear icon to connect puzzle.',
-      ]);
+        [ROOMS[nextIndex].id]: {
+          ...prev[ROOMS[nextIndex].id],
+          consoleLines: [
+            ...prev[ROOMS[nextIndex].id].consoleLines,
+            '',
+            `// Entered ${ROOMS[nextIndex].title}`,
+            '// Use the eye icon for a hint; gear icon to connect puzzle.',
+          ],
+        },
+      }));
     }
+  }
+
+  function goPreviousRoom() {
+    if (currentRoomIndex === 0) return;
+    sound.playClick();
+    const prevIndex = currentRoomIndex - 1;
+    setCurrentRoomIndex(prevIndex);
+    setLastMessage(null);
   }
 
   function useHint() {
@@ -623,7 +754,45 @@ function escape(): string {
     setHintsLeft((prev) => prev - 1);
   }
 
-  // confirm before leaving the page via links (Home, other tabs) while game running
+  async function saveProgress() {
+    try {
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          difficulty,
+          timeLeft,
+          currentRoom: currentRoomIndex,
+          solvedRooms,
+          roomStates,
+        }),
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          setLastMessage('Log in to save your progress.');
+        } else {
+          setLastMessage('Failed to save progress.');
+        }
+        return;
+      }
+      setLastMessage('Progress saved successfully.');
+      setRoomStates((prev) => ({
+        ...prev,
+        [currentRoom.id]: {
+          ...prev[currentRoom.id],
+          consoleLines: [
+            ...prev[currentRoom.id].consoleLines,
+            '',
+            '// Progress saved to server.',
+          ],
+        },
+      }));
+    } catch {
+      setLastMessage('Error while saving progress.');
+    }
+  }
+
+  // confirm before leaving page while game running
   useEffect(() => {
     if (!difficulty) return;
 
@@ -645,7 +814,6 @@ function escape(): string {
 
       const gameActive = timeLeft > 0 && solvedCount < totalRooms;
       if (!gameActive) {
-        // game already over, just stop audio
         sound.stopAmbient();
         return;
       }
@@ -665,13 +833,50 @@ function escape(): string {
     return () => document.removeEventListener('click', handler);
   }, [difficulty, timeLeft, solvedCount, totalRooms, sound]);
 
+  // record a session when user escapes – ONLY ONCE
+  useEffect(() => {
+    if (!difficulty) return;
+
+    const allSolved = solvedCount >= totalRooms;
+    if (!allSolved) return;
+    if (timeLeft <= 0) return;
+    if (sessionRecorded) return;
+
+    const timeTaken = baseTime - timeLeft;
+    setSessionRecorded(true);
+
+    (async () => {
+      try {
+        await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            difficulty,
+            timeTaken,
+          }),
+        });
+      } catch {
+        // ignore
+      }
+    })();
+  }, [
+    solvedCount,
+    totalRooms,
+    timeLeft,
+    baseTime,
+    difficulty,
+    sessionRecorded,
+  ]);
+
   // ---------- RENDER ----------
 
   if (!difficulty) {
-    // keep inside escape-root so your top bar still shows
     return (
       <div className="escape-root">
-        <DifficultySelect onSelect={setDifficulty} />
+        <DifficultySelect
+          onSelect={startNewGame}
+          onResume={handleResume}
+        />
       </div>
     );
   }
@@ -680,16 +885,12 @@ function escape(): string {
   const codeFg = codeTheme === 'dark' ? '#e5e7eb' : '#0f172a';
   const consoleBg = codeTheme === 'dark' ? '#020617' : '#f3f4f6';
 
-  const gameFinished = solvedCount >= totalRooms || timeLeft <= 0;
-
   return (
     <div className="escape-root">
       {/* Header / HUD */}
       <header className="escape-hud">
         <div>
-          <strong>
-            Coding Escape · {currentRoom.title}
-          </strong>
+          <strong>Coding Escape · {currentRoom.title}</strong>
           <div className="escape-meta">
             Room {currentRoomIndex + 1} of {ROOMS.length} · Difficulty:{' '}
             {difficulty}
@@ -697,7 +898,16 @@ function escape(): string {
           <div className="escape-meta">Hints left: {hintsLeft}</div>
         </div>
 
-        <div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {currentRoomIndex > 0 && (
+            <button
+              type="button"
+              onClick={goPreviousRoom}
+              className="escape-btn-secondary"
+            >
+              ← Previous room
+            </button>
+          )}
           <button
             type="button"
             onClick={handleMuteToggle}
@@ -811,7 +1021,7 @@ function escape(): string {
           </header>
 
           <div className="escape-editor-status">
-            {puzzleConnected ? (
+            {currentState.puzzleConnected ? (
               <span>
                 Puzzle connected. Edit the code and click{' '}
                 <strong>EXECUTE</strong>.
@@ -843,8 +1053,17 @@ function escape(): string {
                 </span>
               </div>
               <textarea
-                value={editorCode}
-                onChange={(e) => setEditorCode(e.target.value)}
+                value={currentState.editorCode}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setRoomStates((prev) => ({
+                    ...prev,
+                    [currentRoom.id]: {
+                      ...prev[currentRoom.id],
+                      editorCode: value,
+                    },
+                  }));
+                }}
                 className="escape-code-textarea"
                 spellCheck={false}
               />
@@ -854,7 +1073,7 @@ function escape(): string {
             {/* Controls */}
             <div className="escape-controls-row">
               <div className="escape-controls-left">
-                {!puzzleConnected && (
+                {!currentState.puzzleConnected && (
                   <button
                     type="button"
                     onClick={connectPuzzle}
@@ -871,6 +1090,14 @@ function escape(): string {
                 >
                   EXECUTE
                 </button>
+                <button
+                  type="button"
+                  onClick={saveProgress}
+                  className="escape-btn-secondary"
+                  disabled={gameFinished}
+                >
+                  Save progress
+                </button>
               </div>
               <div className="escape-meta" style={{ textAlign: 'right' }}>
                 Door will open when tests pass.
@@ -885,16 +1112,14 @@ function escape(): string {
                 color: codeTheme === 'dark' ? '#e5e7eb' : '#111827',
               }}
             >
-              {consoleLines.map((line, idx) => (
+              {currentState.consoleLines.map((line, idx) => (
                 <div key={idx}>{line}</div>
               ))}
               <div className="hud-scanlines" />
             </div>
 
             {lastMessage && (
-              <div className="escape-last-message">
-                {lastMessage}
-              </div>
+              <div className="escape-last-message">{lastMessage}</div>
             )}
           </div>
         </section>
@@ -938,7 +1163,7 @@ function escape(): string {
         </div>
       )}
 
-      {/* End game overlay (popup, not full screen) */}
+      {/* End game overlay */}
       {gameFinished && (
         <EndScreen
           success={solvedCount >= totalRooms}
