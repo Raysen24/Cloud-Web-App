@@ -414,6 +414,7 @@ export default function GameShell() {
   const sound = useMemo(() => new SoundManager(), []);
 
   const [sessionRecorded, setSessionRecorded] = useState(false);
+  const [activeSaveId, setActiveSaveId] = useState<number | null>(null); // NEW: which run we are updating
 
   const [codeTheme, setCodeTheme] = useState<'light' | 'dark'>('dark');
   useEffect(() => {
@@ -448,10 +449,20 @@ export default function GameShell() {
     setRoomStates(createInitialRoomStates());
     setLastMessage(null);
     setSessionRecorded(false);
+    setActiveSaveId(null); // NEW: this will make the next save create a new run
   }
 
   // NEW: handle resume from saved state
+    // NEW: handle resume from saved state
   function handleResume(save: any) {
+    // Remember which run this is so future saves update it,
+    // instead of creating a brand‑new row.
+    if (save && typeof save.id === 'number') {
+      setActiveSaveId(save.id);
+    } else {
+      setActiveSaveId(null);
+    }
+
     const diff = (save.difficulty ?? 'easy') as Difficulty;
     const { time, hints } = difficultySettings[diff];
 
@@ -480,6 +491,7 @@ export default function GameShell() {
           (fromServer.room1?.consoleLines as string[] | undefined) ??
           base.room1.consoleLines,
       },
+      // ... rest unchanged ...
       room2: {
         ...base.room2,
         ...(fromServer.room2 as any),
@@ -524,7 +536,7 @@ export default function GameShell() {
         ? save.timeLeft
         : time
     );
-    setHintsLeft(hints); // if you want to persist hints, you can store & load them too
+    setHintsLeft(hints); // if you want to persist hints, also store them
     setCurrentRoomIndex(save.currentRoom ?? 0);
     setSolvedRooms(mappedSolved);
     setRoomStates(merged);
@@ -765,6 +777,7 @@ function escape(): string {
           currentRoom: currentRoomIndex,
           solvedRooms,
           roomStates,
+          saveId: activeSaveId, // NEW: tells backend whether to update or create
         }),
       });
       if (!res.ok) {
@@ -775,6 +788,14 @@ function escape(): string {
         }
         return;
       }
+
+      // If this was a brand-new run, the server just created it and
+      // returned its id. Capture it so subsequent saves update.
+      const data = (await res.json()) as { id?: number };
+      if (data && typeof data.id === 'number') {
+        setActiveSaveId(data.id);
+      }
+
       setLastMessage('Progress saved successfully.');
       setRoomStates((prev) => ({
         ...prev,
@@ -834,6 +855,7 @@ function escape(): string {
   }, [difficulty, timeLeft, solvedCount, totalRooms, sound]);
 
   // record a session when user escapes – ONLY ONCE
+    // record a session when user escapes – ONLY ONCE
   useEffect(() => {
     if (!difficulty) return;
 
@@ -847,6 +869,7 @@ function escape(): string {
 
     (async () => {
       try {
+        // 1) Record leaderboard / session
         await fetch('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -855,8 +878,22 @@ function escape(): string {
             timeTaken,
           }),
         });
+
+        // 2) Auto-save final state so it appears in run history
+        await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            difficulty,
+            timeLeft,
+            currentRoom: currentRoomIndex,
+            solvedRooms,
+            roomStates,
+            saveId: activeSaveId, // update existing run if present, or create a new one
+          }),
+        });
       } catch {
-        // ignore
+        // ignore errors here – leaderboard and history are "nice to have"
       }
     })();
   }, [
@@ -866,6 +903,10 @@ function escape(): string {
     baseTime,
     difficulty,
     sessionRecorded,
+    currentRoomIndex,
+    solvedRooms,
+    roomStates,
+    activeSaveId,
   ]);
 
   // ---------- RENDER ----------

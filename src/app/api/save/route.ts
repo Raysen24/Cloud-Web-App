@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { logEvent } from '@/lib/metrics';
 
 // CREATE / UPDATE (upsert)
+// CREATE / UPDATE a specific run (per-run save)
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
     currentRoom,
     solvedRooms,
     roomStates,
+    saveId: rawSaveId, // NEW: optional id of the run we are continuing
   } = body;
 
   if (
@@ -39,27 +41,46 @@ export async function POST(request: Request) {
     );
   }
 
+  const saveId =
+    typeof rawSaveId === 'number' ? rawSaveId : undefined;
+
   const solvedRoomsJson = JSON.stringify(solvedRooms ?? {});
   const roomStatesJson = roomStates ?? null;
 
-  const existing = await prisma.saveState.findFirst({
-    where: { userId: user.id },
-    orderBy: { updatedAt: 'desc' },
-  });
-
   let save;
-  if (existing) {
-    save = await prisma.saveState.update({
-      where: { id: existing.id },
-      data: {
-        difficulty,
-        timeLeft,
-        currentRoom,
-        solvedRoomsJson,
-        roomStates: roomStatesJson,
-      },
+
+  if (saveId != null) {
+    // Try to update an existing save belonging to this user
+    const existing = await prisma.saveState.findUnique({
+      where: { id: saveId },
     });
+
+    if (existing && existing.userId === user.id) {
+      save = await prisma.saveState.update({
+        where: { id: saveId },
+        data: {
+          difficulty,
+          timeLeft,
+          currentRoom,
+          solvedRoomsJson,
+          roomStates: roomStatesJson,
+        },
+      });
+    } else {
+      // If not found or not owned, fall back to creating a new run
+      save = await prisma.saveState.create({
+        data: {
+          userId: user.id,
+          difficulty,
+          timeLeft,
+          currentRoom,
+          solvedRoomsJson,
+          roomStates: roomStatesJson,
+        },
+      });
+    }
   } else {
+    // No id passed → new run → create new history entry
     save = await prisma.saveState.create({
       data: {
         userId: user.id,

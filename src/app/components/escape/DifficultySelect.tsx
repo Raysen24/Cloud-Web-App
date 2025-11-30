@@ -47,6 +47,21 @@ type SaveHistoryItem = {
   createdAt: string;
 };
 
+// NEW: helper to decide if a run is "finished"
+function isRunFinished(save: ResumeSave | null): boolean {
+  if (!save) return false;
+
+  // If timer has run out, we treat the run as finished / not resumable
+  if (save.timeLeft <= 0) return true;
+
+  // If all rooms are solved, also treat as finished
+  const allRooms = ['room1', 'room2', 'room3', 'room4', 'room5', 'room6'];
+  const solved = save.solvedRooms || {};
+  const allSolved = allRooms.every((roomId) => solved[roomId]);
+
+  return allSolved;
+}
+
 export default function DifficultySelect({ onSelect, onResume }: Props) {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -112,6 +127,7 @@ export default function DifficultySelect({ onSelect, onResume }: Props) {
   }, [boardDifficulty]);
 
   // ----- load latest save when a user is logged in -----
+    // ----- load latest *unfinished* save when a user is logged in -----
   useEffect(() => {
     if (!user) {
       setResumeSave(null);
@@ -128,11 +144,19 @@ export default function DifficultySelect({ onSelect, onResume }: Props) {
           return;
         }
         const data = await res.json();
+
         if (data && data.save) {
-          setResumeSave({
+          const candidate: ResumeSave = {
             ...data.save,
             difficulty: data.save.difficulty as Difficulty,
-          });
+          };
+
+          // 🔴 If the latest save is finished, we DON'T offer "Continue"
+          if (isRunFinished(candidate)) {
+            setResumeSave(null);
+          } else {
+            setResumeSave(candidate);
+          }
         } else {
           setResumeSave(null);
         }
