@@ -45,6 +45,136 @@ type RoomState = {
   puzzleConnected: boolean;
 };
 
+// --- DIFFICULTY AWARE METADATA (titles, subtitles, hint text, puzzle family) ---
+type DiffMeta = Record<
+  Difficulty,
+  Partial<Record<
+    RoomId,
+    Partial<Pick<RoomConfig, 'title' | 'subtitle' | 'hintSubtitle' | 'puzzleType'>>
+  >>
+>;
+
+const DIFF_META: DiffMeta = {
+  easy: {}, // keep your current text/logic
+  medium: {
+    room1: {
+      title: 'Stage 1 – Normalize access token',
+      subtitle:
+        'Clean a messy token: uppercase hex, strip junk, group as 4-4-4.',
+      hintSubtitle:
+        'Pipeline: trim → toUpperCase → keep [0-9A-F] → chunk(4) → join("-").',
+      puzzleType: 'format',
+    },
+    room2: {
+      title: 'Stage 2 – Stable average (2dp)',
+      subtitle:
+        'Return mean rounded to 2 decimals without float drift.',
+      hintSubtitle: 'Do Math.round(avg * 100) / 100.',
+      puzzleType: 'debug',
+    },
+    room3: {
+      title: 'Stage 3 – Prime generator (yield)',
+      subtitle: 'Use function* and yield primes up to the limit.',
+      hintSubtitle: 'Check divisors up to √n; use yield.',
+      puzzleType: 'generator',
+    },
+    room4: {
+      title: 'Stage 4 – TSV → JSON (typed)',
+      subtitle:
+        'Header row → { name, score:number, passed:boolean } objects.',
+      hintSubtitle: 'Split by \\t; cast score:Number, passed:Boolean.',
+      puzzleType: 'csv2json',
+    },
+    room5: {
+      title: 'Stage 5 – Base36 lock',
+      subtitle:
+        'Sum char codes → base36 → upper → padStart(4) → last 4 chars.',
+      hintSubtitle: 'sum→toString(36)→toUpperCase→pad→slice',
+      puzzleType: 'lock',
+    },
+    room6: {
+      title: 'Stage 6 – Compose clean helpers',
+      subtitle: 'Pure, tiny helpers composed together; return ESCAPED.',
+      hintSubtitle: 'No globals; simple composition is enough.',
+      puzzleType: 'final',
+    },
+  },
+  hard: {
+    room1: {
+      title: 'Stage 1 – deepFreeze<T> (format + types + docs)',
+      subtitle:
+        'Reformat & type a generic deepFreeze<T> with JSDoc.',
+      hintSubtitle: 'Generic + Readonly<T> + short JSDoc.',
+      puzzleType: 'format',
+    },
+    room2: {
+      title: 'Stage 2 – Safe currency sum',
+      subtitle:
+        'Sum to 2dp accurately using cents (integers) or BigInt.',
+      hintSubtitle: 'Map to cents; round; sum; /100; toFixed(2).',
+      puzzleType: 'debug',
+    },
+    room3: {
+      title: 'Stage 3 – Sieve up to 100000',
+      subtitle: 'Eratosthenes sieve; start at p*p; fast.',
+      hintSubtitle: 'Boolean/Uint8Array; mark multiples.',
+      puzzleType: 'generator',
+    },
+    room4: {
+      title: 'Stage 4 – Robust CSV parser (quoted)',
+      subtitle:
+        'Quoted fields, embedded commas, escaped quotes; typed mapping.',
+      hintSubtitle: 'State machine inQuotes; trim; headers.',
+      puzzleType: 'csv2json',
+    },
+    room5: {
+      title: 'Stage 5 – Rolling hash lock (6 digits)',
+      subtitle:
+        'Base 131 rolling hash, mod 1e6, padStart(6).',
+      hintSubtitle: 'h=(h*131+code)%1e6; padStart(6).',
+      puzzleType: 'lock',
+    },
+    room6: {
+      title: 'Stage 6 – Typed, pure orchestrator',
+      subtitle:
+        'Compose helpers; no side-effects; return ESCAPED.',
+      hintSubtitle: 'Typed inputs; no DOM; pure.',
+      puzzleType: 'final',
+    },
+  },
+};
+
+// Map difficulty → correct image path set
+function imgPath(level: Difficulty, roomId: RoomId, kind: 'closed'|'open'|'hint'): string {
+  const base = level === 'easy' ? '/escape' : `/escape/${level}`;
+  // roomId like 'room3' -> "room3_closed.png"
+  return `${base}/${roomId}_${kind}.png`;
+}
+
+// Merge base (easy) room with difficulty text + images
+function resolveRoom(base: RoomConfig, level: Difficulty): RoomConfig {
+  const over = (DIFF_META[level]?.[base.id]) ?? {};
+  return {
+    ...base,
+    ...over,
+    closedImage: imgPath(level, base.id, 'closed'),
+    openImage:   imgPath(level, base.id, 'open'),
+    hintImage:   imgPath(level, base.id, 'hint'),
+  };
+}
+
+function themedIconPath(
+  kind: 'eye' | 'gear' | 'door',
+  level: Difficulty | null
+): string {
+  if (!level || level === 'easy') {
+    // keep your current easy icons
+    return `/escape/icon_${kind}.svg`;
+  }
+  const themeFolder = level === 'medium' ? 'purple' : 'red';
+  return `/escape/icons/${themeFolder}/${kind}.svg`;
+}
+
 const ROOMS: RoomConfig[] = [
   {
     id: 'room1',
@@ -163,192 +293,338 @@ type ValidationResult = {
   consoleLines: string[];
 };
 
-function validateCode(room: RoomConfig, code: string): ValidationResult {
-  const trimmed = code.trim();
+function validateCode(
+  room: RoomConfig,
+  code: string,
+  difficulty: Difficulty
+): ValidationResult {
+  const t = code.trim();
+  const has = (...snips: string[]) => snips.some((s) => t.includes(s));
+  const all = (...snips: string[]) => snips.every((s) => t.includes(s));
 
-  switch (room.puzzleType) {
-    case 'format': {
-      const hasFunctionName = trimmed.includes('formatDoorCode');
-      const hasNewlines = trimmed.split('\n').length >= 4;
-      const hasBraces = trimmed.includes('{') && trimmed.includes('}');
-      const hasReturn = trimmed.includes('return ');
-
-      if (hasFunctionName && hasNewlines && hasBraces && hasReturn) {
-        return {
-          ok: true,
-          message:
-            'Code formatted and readable. Panel accepts your function!',
-          consoleLines: [
-            '> lint formatDoorCode.ts',
-            'No issues found – nice formatting.',
-            'Door control: OK ✅',
-          ],
-        };
+  if (difficulty === 'medium') {
+    switch (room.id) {
+      case 'room1': {
+        const ok =
+          all('formatAccessToken') &&
+          has('toUpperCase(') &&
+          has('/[^0-9A-F]/g') &&
+          has("match(/.{1,4}/g") &&
+          has("join('-')");
+        return ok
+          ? {
+              ok: true,
+              message: 'Token normalized.',
+              consoleLines: ['> normalize', 'OK ✅'],
+            }
+          : {
+              ok: false,
+              message:
+                'Trim, uppercase, strip non-hex, group 4-4-4 with hyphens.',
+              consoleLines: ['> normalize', 'Missing steps.'],
+            };
       }
-      return {
-        ok: false,
-        message:
-          'Formatting not good enough. Keep the name formatDoorCode and use multiple lines with braces and a return.',
-        consoleLines: [
-          '> lint formatDoorCode.ts',
-          'Issues: missing newlines / braces or function name.',
-        ],
-      };
-    }
-
-    case 'debug': {
-      const hasEvenCheck =
-        trimmed.includes('% 2 === 0') || trimmed.includes('%2===0');
-      const hasLoop = trimmed.includes('for') || trimmed.includes('while');
-
-      if (hasEvenCheck && hasLoop) {
-        return {
-          ok: true,
-          message:
-            'You fixed the logic! The console returns the first even door id.',
-          consoleLines: [
-            '> run getFirstEvenDoorId([3,5,4,7])',
-            'Output: 4',
-            'Expected: 4 — tests passed ✅',
-          ],
-        };
+      case 'room2': {
+        const ok = all('averageTwoDecimals', 'Math.round', '* 100', '/ 100');
+        return ok
+          ? {
+              ok: true,
+              message: 'Stable average computed.',
+              consoleLines: ['> avg', '2dp ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Use Math.round(avg*100)/100.',
+              consoleLines: ['> avg', 'Unstable rounding.'],
+            };
       }
-      return {
-        ok: false,
-        message:
-          'The function should return the first even id. Use a loop and check ids[i] % 2 === 0.',
-        consoleLines: [
-          '> run getFirstEvenDoorId([3,5,4,7])',
-          'Output: ?? (still wrong)',
-        ],
-      };
-    }
-
-    case 'generator': {
-      const mentionsLoop = trimmed.includes('for') || trimmed.includes('while');
-      const mentionsBounds =
-        trimmed.includes('<= 1000') || trimmed.includes('<=1000');
-      const mentionsStart =
-        trimmed.includes('= 0') || trimmed.includes('=0');
-
-      if (mentionsLoop && mentionsBounds && mentionsStart) {
-        return {
-          ok: true,
-          message:
-            'Loop looks correct — every integer from 0 to 1000 is generated.',
-          consoleLines: [
-            '> run generateSequence()',
-            'Output length: 1001',
-            'First: 0, Last: 1000 — tests passed ✅',
-          ],
-        };
+      case 'room3': {
+        const ok = all('function*', 'yield') && has('primesUpTo');
+        return ok
+          ? {
+              ok: true,
+              message: 'Generator yields primes.',
+              consoleLines: ['> primes', 'Generator ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Use function* and yield.',
+              consoleLines: ['> primes', 'Not a generator.'],
+            };
       }
-      return {
-        ok: false,
-        message:
-          'Hint: use a for-loop starting at 0 and continuing while i <= 1000.',
-        consoleLines: [
-          '> run generateSequence()',
-          'Tests failed — loop bounds or start index incorrect.',
-        ],
-      };
-    }
-
-    case 'csv2json': {
-      const usesSplit = trimmed.includes('.split(');
-      const usesMap = trimmed.includes('.map(') || trimmed.includes('map(');
-      const usesCurly = trimmed.includes('{') && trimmed.includes('}');
-
-      if (usesSplit && usesMap && usesCurly) {
-        return {
-          ok: true,
-          message:
-            'Nice! You are splitting CSV and mapping rows into objects.',
-          consoleLines: [
-            '> run parseCsv(csvText)',
-            'Parsed 3 records.',
-            'First: { name: "Alice", score: 98 } — tests passed ✅',
-          ],
-        };
+      case 'room4': {
+        const ok =
+          all('tsvToJson', '\\t', 'headers') && has('Number(') && has("=== 'true'");
+        return ok
+          ? {
+              ok: true,
+              message: 'TSV parsed & typed.',
+              consoleLines: ['> tsv', 'Typed ✅'],
+            }
+          : {
+              ok: false,
+              message:
+                'Header row; split by \\t; cast score Number & passed Boolean.',
+              consoleLines: ['> tsv', 'Missing conversions.'],
+            };
       }
-      return {
-        ok: false,
-        message:
-          'Split the CSV into lines, then split each line by comma and build { name, score } objects in an array.',
-        consoleLines: [
-          '> run parseCsv(csvText)',
-          'Tests failed — missing split/map/object construction.',
-        ],
-      };
-    }
-
-    case 'lock': {
-      const hasFunctionName = trimmed.includes('computeLockCode');
-      const expected =
-        trimmed.includes('"LAB-451"') || trimmed.includes("'LAB-451'");
-      const usesSliceOrSubstring =
-        trimmed.includes('.slice') || trimmed.includes('.substring');
-
-      if (hasFunctionName && expected && usesSliceOrSubstring) {
-        return {
-          ok: true,
-          message:
-            'You computed the lock code correctly. The keypad glows green.',
-          consoleLines: [
-            '> run computeLockCode("LAB-451")',
-            'Output: "0451"',
-            'Door lock: ACCEPTED ✅',
-          ],
-        };
+      case 'room5': {
+        const ok =
+          all('computeLockBase36', 'charCodeAt', 'toString(36)', 'toUpperCase') &&
+          has('padStart(4');
+        return ok
+          ? {
+              ok: true,
+              message: 'Base36 lock computed.',
+              consoleLines: ['> lock', 'OK ✅'],
+            }
+          : {
+              ok: false,
+              message: 'sum→base36→upper→pad4→last4.',
+              consoleLines: ['> lock', 'Pipeline incomplete.'],
+            };
       }
-      return {
-        ok: false,
-        message:
-          'Use the input string "LAB-451" and extract a 4-digit code using slice/substring and maybe padStart.',
-        consoleLines: [
-          '> run computeLockCode("LAB-451")',
-          'Door lock: REJECTED — code mismatch.',
-        ],
-      };
-    }
-
-    case 'final': {
-      const hasEscapeFn = trimmed.includes('escape');
-      const returnsEscaped = trimmed.toUpperCase().includes('ESCAPED');
-
-      if (hasEscapeFn && returnsEscaped) {
-        return {
-          ok: true,
-          message:
-            'Final check passed! The main exit door slides open — you escaped.',
-          consoleLines: [
-            '> run escape()',
-            'Output: "ESCAPED"',
-            'All integration tests passed ✅',
-          ],
-        };
+      case 'room6': {
+        const ok = has('escape(') && t.toUpperCase().includes('ESCAPED');
+        return ok
+          ? {
+              ok: true,
+              message: 'Pipeline composed.',
+              consoleLines: ['> escape', 'ESCAPED ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Return "ESCAPED". Compose helpers (pure).',
+              consoleLines: ['> escape', 'Missing token.'],
+            };
       }
-      return {
-        ok: false,
-        message:
-          'Write an escape() function that returns a string like "ESCAPED". The word ESCAPED must appear in your return value.',
-        consoleLines: [
-          '> run escape()',
-          'Tests failed — ensure escape() exists and returns "ESCAPED".',
-        ],
-      };
     }
-
-    default:
-      return {
-        ok: false,
-        message: 'Unknown puzzle type.',
-        consoleLines: ['No validator configured.'],
-      };
   }
+
+  if (difficulty === 'hard') {
+    switch (room.id) {
+      case 'room1': {
+        const ok = all('deepFreeze<', '/**') && has('Readonly<');
+        return ok
+          ? {
+              ok: true,
+              message: 'deepFreeze<T> formatted & typed.',
+              consoleLines: ['> lint', 'Types & docs ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Use generics, Readonly<T>, and JSDoc.',
+              consoleLines: ['> lint', 'Insufficient typing/docs.'],
+            };
+      }
+      case 'room2': {
+        const ok =
+          (all('Math.round', '* 100', ' / 100') || has('BigInt')) &&
+          has('toFixed(2)');
+        return ok
+          ? {
+              ok: true,
+              message: 'Currency summed safely.',
+              consoleLines: ['> money', '2dp ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Sum as cents (or BigInt) then toFixed(2).',
+              consoleLines: ['> money', 'Float drift detected.'],
+            };
+      }
+      case 'room3': {
+        const ok =
+          has('sieve(') &&
+          (has('Uint8Array') || all('Array(', 'fill(')) &&
+          has('p * p <=') &&
+          has('+= p');
+        return ok
+          ? {
+              ok: true,
+              message: 'Sieve implemented.',
+              consoleLines: ['> sieve', 'Fast ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Use sieve: boolean array, start at p*p.',
+              consoleLines: ['> sieve', 'Not sieve-like.'],
+            };
+      }
+      case 'room4': {
+        const ok =
+          has('robustCsv') &&
+          (has('inQuotes') || has('state')) &&
+          has('trim(') &&
+          has('headers') &&
+          (has('Number(') || has('parseFloat')) &&
+          has('new Date(');
+        return ok
+          ? {
+              ok: true,
+              message: 'Quoted CSV handled.',
+              consoleLines: ['> csv', 'Quoted fields ✅'],
+            }
+          : {
+              ok: false,
+              message: 'State machine for quotes; trim; headers; type cast.',
+              consoleLines: ['> csv', 'Quoted commas not handled.'],
+            };
+      }
+      case 'room5': {
+        const ok =
+          has('hashLock') && has('* 131') && has('% 1_000_000') && has('padStart(6');
+        return ok
+          ? {
+              ok: true,
+              message: 'Rolling hash accepted.',
+              consoleLines: ['> lock', '6 digits ✅'],
+            }
+          : {
+              ok: false,
+              message: 'Use base 131 rolling hash; mod 1e6; padStart(6).',
+              consoleLines: ['> lock', 'Wrong scheme.'],
+            };
+      }
+      case 'room6': {
+        const ok =
+          has('escape(') &&
+          has(': { seed: string }') &&
+          !has('window.') &&
+          !has('document.') &&
+          t.toUpperCase().includes('ESCAPED');
+        return ok
+          ? {
+              ok: true,
+              message: 'Typed, pure orchestrator.',
+              consoleLines: ['> escape', 'All green ✅'],
+            }
+          : {
+              ok: false,
+              message:
+                'Typed signature, pure (no DOM), return "ESCAPED".',
+              consoleLines: ['> escape', 'Not pure/typed.'],
+            };
+      }
+    }
+  }
+
+  // EASY = your original rules (unchanged)
+  return ((): ValidationResult => {
+    const trimmed = code.trim();
+    switch (room.puzzleType) {
+      case 'format': {
+        const hasFunctionName = trimmed.includes('formatDoorCode');
+        const hasNewlines = trimmed.split('\n').length >= 4;
+        const hasBraces = trimmed.includes('{') && trimmed.includes('}');
+        const hasReturn = trimmed.includes('return ');
+        if (hasFunctionName && hasNewlines && hasBraces && hasReturn) {
+          return {
+            ok: true,
+            message: 'Code formatted and readable. Panel accepts your function!',
+            consoleLines: ['> lint formatDoorCode.ts', 'No issues found – nice formatting.', 'Door control: OK ✅'],
+          };
+        }
+        return {
+          ok: false,
+          message:
+            'Formatting not good enough. Keep the name formatDoorCode and use multiple lines with braces and a return.',
+          consoleLines: ['> lint formatDoorCode.ts', 'Issues: missing newlines / braces or function name.'],
+        };
+      }
+      case 'debug': {
+        const hasEvenCheck = trimmed.includes('% 2 === 0') || trimmed.includes('%2===0');
+        const hasLoop = trimmed.includes('for') || trimmed.includes('while');
+        if (hasEvenCheck && hasLoop) {
+          return {
+            ok: true,
+            message: 'You fixed the logic! The console returns the first even door id.',
+            consoleLines: ['> run getFirstEvenDoorId([3,5,4,7])', 'Output: 4', 'Expected: 4 — tests passed ✅'],
+          };
+        }
+        return {
+          ok: false,
+          message: 'The function should return the first even id. Use a loop and check ids[i] % 2 === 0.',
+          consoleLines: ['> run getFirstEvenDoorId([3,5,4,7])', 'Output: ?? (still wrong)'],
+        };
+      }
+      case 'generator': {
+        const mentionsLoop = trimmed.includes('for') || trimmed.includes('while');
+        const mentionsBounds = trimmed.includes('<= 1000') || trimmed.includes('<=1000');
+        const mentionsStart = trimmed.includes('= 0') || trimmed.includes('=0');
+        if (mentionsLoop && mentionsBounds && mentionsStart) {
+          return {
+            ok: true,
+            message: 'Loop looks correct — every integer from 0 to 1000 is generated.',
+            consoleLines: ['> run generateSequence()', 'Output length: 1001', 'First: 0, Last: 1000 — tests passed ✅'],
+          };
+        }
+        return {
+          ok: false,
+          message: 'Hint: use a for-loop starting at 0 and continuing while i <= 1000.',
+          consoleLines: ['> run generateSequence()', 'Tests failed — loop bounds or start index incorrect.'],
+        };
+      }
+      case 'csv2json': {
+        const usesSplit = trimmed.includes('.split(');
+        const usesMap = trimmed.includes('.map(') || trimmed.includes('map(');
+        const usesCurly = trimmed.includes('{') && trimmed.includes('}');
+        if (usesSplit && usesMap && usesCurly) {
+          return {
+            ok: true,
+            message: 'Nice! You are splitting CSV and mapping rows into objects.',
+            consoleLines: ['> run parseCsv(csvText)', 'Parsed 3 records.', 'First: { name: "Alice", score: 98 } — tests passed ✅'],
+          };
+        }
+        return {
+          ok: false,
+          message: 'Split the CSV into lines, then split each line by comma and build { name, score } objects in an array.',
+          consoleLines: ['> run parseCsv(csvText)', 'Tests failed — missing split/map/object construction.'],
+        };
+      }
+      case 'lock': {
+        const hasFunctionName = trimmed.includes('computeLockCode');
+        const expected =
+          trimmed.includes('"LAB-451"') || trimmed.includes("'LAB-451'");
+        const usesSliceOrSubstring =
+          trimmed.includes('.slice') || trimmed.includes('.substring');
+        if (hasFunctionName && expected && usesSliceOrSubstring) {
+          return {
+            ok: true,
+            message: 'You computed the lock code correctly. The keypad glows green.',
+            consoleLines: ['> run computeLockCode("LAB-451")', 'Output: "0451"', 'Door lock: ACCEPTED ✅'],
+          };
+        }
+        return {
+          ok: false,
+          message:
+            'Use the input string "LAB-451" and extract a 4-digit code using slice/substring and maybe padStart.',
+          consoleLines: ['> run computeLockCode("LAB-451")', 'Door lock: REJECTED — code mismatch.'],
+        };
+      }
+      case 'final': {
+        const hasEscapeFn = trimmed.includes('escape');
+        const returnsEscaped = trimmed.toUpperCase().includes('ESCAPED');
+        if (hasEscapeFn && returnsEscaped) {
+          return {
+            ok: true,
+            message: 'Final check passed! The main exit door slides open — you escaped.',
+            consoleLines: ['> run escape()', 'Output: "ESCAPED"', 'All integration tests passed ✅'],
+          };
+        }
+        return {
+          ok: false,
+          message: 'Write an escape() function that returns a string like "ESCAPED". The word ESCAPED must appear in your return value.',
+          consoleLines: ['> run escape()', 'Tests failed — ensure escape() exists and returns "ESCAPED".'],
+        };
+      }
+      default:
+        return { ok: false, message: 'Unknown puzzle type.', consoleLines: ['No validator configured.'] };
+    }
+  })();
 }
 
-function hotspotStyle(leftPerc: number, topPerc: number): React.CSSProperties {
+function hotspotStyle(leftPerc: number, topPerc: number, color = '#f8fafc'): React.CSSProperties {
   return {
     position: 'absolute',
     left: `${leftPerc}%`,
@@ -362,8 +638,8 @@ function hotspotStyle(leftPerc: number, topPerc: number): React.CSSProperties {
     justifyContent: 'center',
     cursor: 'pointer',
     background: 'rgba(15,23,42,0.7)',
-    border: '2px solid rgba(248,250,252,0.9)',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+    border: `2px solid ${color}`,
+    boxShadow: `0 0 10px ${color}88, 0 0 22px ${color}55`,
     transition: 'transform 0.12s ease, box-shadow 0.12s ease',
   };
 }
@@ -429,7 +705,11 @@ export default function GameShell() {
     return () => observer.disconnect();
   }, []);
 
-  const currentRoom = ROOMS[currentRoomIndex];
+  const baseRoom = ROOMS[currentRoomIndex];
+  const currentRoom = useMemo(
+    () => resolveRoom(baseRoom, (difficulty ?? 'easy') as Difficulty),
+    [baseRoom, difficulty]
+  );
   const currentState = roomStates[currentRoom.id];
 
   const solvedCount = ROOMS.filter((r) => solvedRooms[r.id]).length;
@@ -601,55 +881,123 @@ export default function GameShell() {
     setShowHint(true);
   }
 
-  function getStarterCode(room: RoomConfig): string {
+  function getStarterCode(room: RoomConfig, level: Difficulty): string {
+    if (level === 'medium') {
+      switch (room.id) {
+        case 'room1':
+          return `export function formatAccessToken(input: string): string {
+    // trim -> toUpperCase -> keep [0-9A-F] -> chunk(4) -> join('-')
+    return "";
+  }`;
+        case 'room2':
+          return `export function averageTwoDecimals(nums: number[]): number {
+    // avg rounded to 2dp without float drift
+    return 0;
+  }`;
+        case 'room3':
+          return `export function* primesUpTo(limit: number): Generator<number> {
+    // function* + yield primes ≤ limit
+  }`;
+        case 'room4':
+          return `export type Row = { name: string; score: number; passed: boolean };
+  export function tsvToJson(tsv: string): Row[] {
+    // header row; split by \\t; cast score & passed
+    return [];
+  }`;
+        case 'room5':
+          return `export function computeLockBase36(s: string): string {
+    // sum charCode -> toString(36) -> upper -> padStart(4) -> last 4
+    return "";
+  }`;
+        case 'room6':
+          return `export function escape(): string {
+    // compose helpers (pure)
+    return "ESCAPED";
+  }`;
+      }
+    }
+
+    if (level === 'hard') {
+      switch (room.id) {
+        case 'room1':
+          return `/** Deep-freeze an object recursively */
+  export function deepFreeze<T>(o:T): Readonly<T>{Object.freeze(o);for(const k in o){const v:(any)=(o as any)[k];if(v&&typeof v==="object"&&!Object.isFrozen(v))deepFreeze(v);}return o as Readonly<T>;}`;
+        case 'room2':
+          return `export function sumCurrency2dp(values: number[]): string {
+    // use cents (Math.round(v*100)); then toFixed(2)
+    return "0.00";
+  }`;
+        case 'room3':
+          return `export function sieve(limit: number): number[] {
+    // boolean/Uint8Array sieve; start at p*p
+    return [];
+  }`;
+        case 'room4':
+          return `export type Rec = { name: string; score: number; date: Date };
+  export function robustCsv(csv: string): Rec[] {
+    // state machine; quotes/commas; trim; headers; type cast
+    return [];
+  }`;
+        case 'room5':
+          return `export function hashLock(s: string): string {
+    // rolling hash base 131, mod 1_000_000, padStart(6)
+    return "";
+  }`;
+        case 'room6':
+          return `export function escape(_config: { seed: string }): string {
+    // typed, pure composition
+    return "ESCAPED";
+  }`;
+      }
+    }
+
+    // Default: keep your Easy starter code
     switch (room.puzzleType) {
       case 'format':
         return `// TODO: make this function nicely formatted and readable.
-function formatDoorCode(){const doorId=[1,2,3,4].find((id)=>id===4);return doorId}`;
+  function formatDoorCode(){const doorId=[1,2,3,4].find((id)=>id===4);return doorId}`;
       case 'debug':
         return `// TODO: fix the logic so this returns the first even id.
-function getFirstEvenDoorId(ids) {
-  for (let i = 0; i < ids.length; i++) {
-    if (ids[i] % 2 === 1) { // BUG: this should check for even
-      return ids[i];
+  function getFirstEvenDoorId(ids) {
+    for (let i = 0; i < ids.length; i++) {
+      if (ids[i] % 2 === 1) { // BUG: this should check for even
+        return ids[i];
+      }
     }
-  }
-  return -1;
-}`;
+    return -1;
+  }`;
       case 'generator':
         return `// TODO: generate all integers from 0 to 1000 (inclusive).
-function generateSequence() {
-  const result: number[] = [];
-  // write your loop here
-  return result;
-}`;
+  function generateSequence() {
+    const result: number[] = [];
+    // write your loop here
+    return result;
+  }`;
       case 'csv2json':
         return `// TODO: convert CSV text into an array of { name, score } objects.
-function parseCsv(csvText: string) {
-  // CSV example:
-  // name,score
-  // Alice,98
-  // Bob,76
-  const rows = csvText.trim().split("\\n");
-  const result: { name: string; score: number }[] = [];
-  // fill result
-  return result;
-}`;
+  function parseCsv(csvText: string) {
+    // CSV example:
+    // name,score
+    // Alice,98
+    // Bob,76
+    const rows = csvText.trim().split("\\n");
+    const result: { name: string; score: number }[] = [];
+    // fill result
+    return result;
+  }`;
       case 'lock':
         return `// TODO: return a 4-digit code computed from the input string.
-function computeLockCode(input: string): string {
-  // HINT: input might look like "LAB-451"
-  // Use slice/substring and maybe padStart to build something like "0451".
-  return "";
-}`;
+  function computeLockCode(input: string): string {
+    // HINT: input might look like "LAB-451"
+    // Use slice/substring and maybe padStart to build something like "0451".
+    return "";
+  }`;
       case 'final':
         return `// TODO: final escape function – combine ideas from the other rooms.
-function escape(): string {
-  // You have formatted code, debugged logic, generated ranges,
-  // converted CSV to JSON, and computed a lock code.
-  // Return a string that proves you are ready to escape.
-  return "";
-}`;
+  function escape(): string {
+    // Return a string that proves you are ready to escape.
+    return "";
+  }`;
       default:
         return '// No starter code for this room yet.';
     }
@@ -662,7 +1010,7 @@ function escape(): string {
       ...prev,
       [currentRoom.id]: {
         ...prev[currentRoom.id],
-        editorCode: getStarterCode(currentRoom),
+        editorCode: getStarterCode(currentRoom, difficulty as Difficulty),
         puzzleConnected: true,
         consoleLines: [
           ...prev[currentRoom.id].consoleLines,
@@ -698,7 +1046,7 @@ function escape(): string {
       return;
     }
 
-    const result = validateCode(currentRoom, currentState.editorCode);
+    const result = validateCode(currentRoom, currentState.editorCode, difficulty as Difficulty);
     setRoomStates((prev) => ({
       ...prev,
       [currentRoom.id]: {
@@ -925,6 +1273,13 @@ function escape(): string {
   const codeBg = codeTheme === 'dark' ? '#020617' : '#f9fafb';
   const codeFg = codeTheme === 'dark' ? '#e5e7eb' : '#0f172a';
   const consoleBg = codeTheme === 'dark' ? '#020617' : '#f3f4f6';
+  
+  const hotspotColor =
+    !difficulty || difficulty === 'easy'
+      ? 'rgba(248,250,252,0.9)' // original
+      : difficulty === 'medium'
+      ? '#c084fc' // purple glow
+      : '#f87171'; // red glow
 
   return (
     <div className="escape-root">
@@ -1000,12 +1355,13 @@ function escape(): string {
             }}
             style={hotspotStyle(
               currentRoom.hotspots.eye.left,
-              currentRoom.hotspots.eye.top
+              currentRoom.hotspots.eye.top,
+              hotspotColor
             )}
             aria-label="Hint"
           >
             <img
-              src="/escape/icon_eye.svg"
+              src={themedIconPath('eye', difficulty)}
               alt="Hint"
               className="escape-hotspot-icon"
             />
@@ -1017,12 +1373,13 @@ function escape(): string {
             onClick={handleGearClick}
             style={hotspotStyle(
               currentRoom.hotspots.gear.left,
-              currentRoom.hotspots.gear.top
+              currentRoom.hotspots.gear.top,
+              hotspotColor
             )}
             aria-label="Connect puzzle"
           >
             <img
-              src="/escape/icon_gear.svg"
+              src={themedIconPath('gear', difficulty)}
               alt="Puzzle"
               className="escape-hotspot-icon"
             />
@@ -1035,14 +1392,15 @@ function escape(): string {
             style={{
               ...hotspotStyle(
                 currentRoom.hotspots.door.left,
-                currentRoom.hotspots.door.top
+                currentRoom.hotspots.door.top,
+                hotspotColor
               ),
               opacity: solvedRooms[currentRoom.id] ? 1 : 0.35,
             }}
             aria-label="Next room"
           >
             <img
-              src="/escape/icon_door.svg"
+              src={themedIconPath('door', difficulty)}
               alt="Open door"
               className="escape-hotspot-icon"
             />

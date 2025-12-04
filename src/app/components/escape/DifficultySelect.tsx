@@ -345,25 +345,13 @@ export default function DifficultySelect({ onSelect, onResume }: Props) {
                   flexWrap: 'wrap',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => onSelect('easy')}
-                  style={btnPrimary}
-                >
+                <button type="button" onClick={() => onSelect('easy')} style={btnEasy}>
                   Easy
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onSelect('medium')}
-                  style={btnPrimary}
-                >
+                <button type="button" onClick={() => onSelect('medium')} style={btnMedium}>
                   Medium
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onSelect('hard')}
-                  style={btnPrimary}
-                >
+                <button type="button" onClick={() => onSelect('hard')} style={btnHard}>
                   Hard
                 </button>
               </div>
@@ -1021,6 +1009,52 @@ const btnPrimary: React.CSSProperties = {
   fontWeight: 600,
   boxShadow: '0 10px 30px rgba(15,23,42,0.9)',
   transition: 'transform .12s ease, box-shadow .12s ease, background .12s',
+};
+
+// --- Neon themed difficulty buttons ---
+const btnEasy: React.CSSProperties = {
+  padding: '10px 22px',
+  color: '#eaf2ff',
+  border: '1px solid rgba(96,165,250,0.8)',
+  borderRadius: 999,
+  cursor: 'pointer',
+  fontSize: 15,
+  fontWeight: 700,
+  background:
+    'radial-gradient(120% 120% at 20% 20%, rgba(59,130,246,0.7), rgba(59,130,246,0.15))',
+  boxShadow:
+    '0 0 8px rgba(59,130,246,0.9), 0 0 24px rgba(59,130,246,0.55), inset 0 0 10px rgba(96,165,250,0.35)',
+  transition: 'transform .12s ease, box-shadow .12s ease',
+};
+
+const btnMedium: React.CSSProperties = {
+  padding: '10px 22px',
+  color: '#f4eaff',
+  border: '1px solid rgba(168,85,247,0.85)',
+  borderRadius: 999,
+  cursor: 'pointer',
+  fontSize: 15,
+  fontWeight: 700,
+  background:
+    'radial-gradient(120% 120% at 20% 20%, rgba(168,85,247,0.75), rgba(168,85,247,0.16))',
+  boxShadow:
+    '0 0 8px rgba(168,85,247,0.95), 0 0 24px rgba(168,85,247,0.55), inset 0 0 10px rgba(192,132,252,0.35)',
+  transition: 'transform .12s ease, box-shadow .12s ease',
+};
+
+const btnHard: React.CSSProperties = {
+  padding: '10px 22px',
+  color: '#ffeeee',
+  border: '1px solid rgba(239,68,68,0.9)',
+  borderRadius: 999,
+  cursor: 'pointer',
+  fontSize: 15,
+  fontWeight: 700,
+  background:
+    'radial-gradient(120% 120% at 20% 20%, rgba(239,68,68,0.8), rgba(239,68,68,0.16))',
+  boxShadow:
+    '0 0 8px rgba(239,68,68,0.95), 0 0 24px rgba(239,68,68,0.55), inset 0 0 10px rgba(248,113,113,0.35)',
+  transition: 'transform .12s ease, box-shadow .12s ease',
 };
 
 const inputStyle: React.CSSProperties = {
