@@ -16,7 +16,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = await request.json();
+  let body: any;
+  try {
+    const contentType = request.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error('non_json_body');
+    }
+    body = await request.json();
+  } catch (err) {
+    logEvent('save_progress', {
+      userId: user.id,
+      error: 'invalid_json',
+    });
+    return NextResponse.json(
+      { error: 'Invalid JSON body' },
+      { status: 400 }
+    );
+  }
+  
   const {
     difficulty,
     timeLeft,
