@@ -1,40 +1,41 @@
-# Dockerfile for Next.js + Prisma app
+# Dockerfile (Next.js + Prisma)
 
-# --- Base image
+# ---- Base image we use everywhere (20.19+ is REQUIRED for Prisma 7.1) ----
 FROM node:20.19-alpine AS base
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# --- Install deps (dev deps included for build)
+# ---- Install dependencies (uses lockfile) ----
 FROM base AS deps
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# --- Build
-FROM base AS builder
-ENV NODE_ENV=production
+# ---- Build stage ----
+FROM base AS build
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Generate Prisma client (no DB connection required)
+# Generate Prisma client with alpine/musl target
 RUN npx prisma generate
 # Build Next.js app
 RUN npm run build
 
-# --- Production runtime
-FROM base AS runner
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
+# ---- Runtime image (small, only what we need) ----
+FROM node:20.19-alpine AS runner
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
+ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 
-# Only copy what we need to run
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
-# ❌ Do not copy .env; set envs via Azure App Settings
-# COPY --from=builder /app/.env ./.env
+# Copy minimal runtime artifacts
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/prisma ./prisma
 
 EXPOSE 3000
-CMD ["npm", "start"]  # package.json: "start": "next start -p $PORT -H 0.0.0.0"
+
+# Start Next.js and bind to the platform port/host
+CMD ["npm","start"]
