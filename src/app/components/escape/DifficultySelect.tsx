@@ -748,7 +748,7 @@ export default function DifficultySelect({ onSelect, onResume }: Props) {
                 >
                   Cloud view:{' '}
                   <a
-                    href="https://your-api-gateway-url/dev/leaderboard?difficulty=easy"
+                    href={`https://cwa-leaderboard-fn6553.azurewebsites.net/api/leaderboard?difficulty=${boardDifficulty}`}
                     target="_blank"
                     rel="noreferrer"
                     style={{ textDecoration: 'underline', color: '#93c5fd' }}
