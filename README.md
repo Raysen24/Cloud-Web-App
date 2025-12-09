@@ -1,10 +1,36 @@
-﻿# CWA Assignment 1
+# CWA Assignment 1 & 2 – Coding Escape
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+The app implements:
 
-First, run the development server:
+- A **Tabs** builder (Assignment 1)
+- A full **Coding Escape Room** game with timer, puzzles and persistence (Assignment 2)
+- Docker, Prisma, API routes, Playwright tests, cloud deployment and a serverless leaderboard page
+
+---
+
+## Getting Started (Local Development)
+
+First, install dependencies:
+
+```bash
+npm install
+# or
+yarn
+# or
+pnpm install
+# or
+bun install
+```
+
+Run Prisma migrations / schema sync (SQLite):
+
+```bash
+npx prisma db push
+```
+
+Then run the development server:
 
 ```bash
 npm run dev
@@ -15,79 +41,199 @@ pnpm dev
 # or
 bun dev
 ```
-Open http://localhost:3000 with your browser to see the result.
 
-You can start editing the page by modifying app/page.tsx. The page auto-updates as you edit the file.
+Open http://localhost:3000 with your browser to see the app.
 
-This project uses next/font to automatically optimize and load Geist, a new font family for Vercel.
+The escape room page (locally) is available at:
 
-## Learn More
-To learn more about Next.js, take a look at the following resources:
+```bash
+http://localhost:3000/escape-room
+```
 
-Next.js Documentation - learn about Next.js features and API.
+## Running in Docker
 
-Learn Next.js - an interactive Next.js tutorial.
+Build the Docker image:
 
-You can check out the Next.js GitHub repository - your feedback and contributions are welcome!
+```bash
+docker build -t cwa-assignment .
+```
 
-## Deploy on Vercel
-The easiest way to deploy your Next.js app is to use the Vercel Platform from the creators of Next.js.
+Run the container:
 
-Check out our Next.js deployment documentation for more details.
+```bash
+docker run --rm -p 3000:3000 cwa-assignment
+```
 
-## 📊 Grading Criteria Fulfillment
-### User Interface (✔ Full Score: 4/4)
-✅ Navigation Bar (tab bar) implemented in Tabs builder
+Then open http://localhost:3000 to use the app running inside Docker.
 
-✅ Header component (Header.tsx)
+## Key URLs (Deployed)
 
-✅ Footer component (Footer.tsx)
+- #### Escape Room (deployed on Azure Container Apps)
+  ```bash
+  https://cwa-next-app.salmonsky-18cb5f22.southeastasia.azurecontainerapps.io/escape-room
+  ```
+- #### Root app (deployed)
+  ```bash
+  https://cwa-next-app.salmonsky-18cb5f22.southeastasia.azurecontainerapps.io/
+  ```
+- #### Lambda / Azure Function leaderboard (dynamic HTML)
+  ```bash
+  https://cwa-leaderboard-fn6553.azurewebsites.net/api/leaderboard?difficulty=easy
+  ```
+  (the difficulty parameter is switched from the UI: `easy | medium | hard`)
 
-✅ About page with student info + video
+## Running Tests (Playwright)
 
-### Themes (✔ Full Score: 3/3)
-✅ Dark Mode toggle
+Install Playwright browsers:
+```bash
+npx playwright install
+```
 
-✅ Light Mode toggle
+Run all tests:
+```bash
+npx playwright test
+```
 
-✅ Persisted with localStorage
+Run specific suites:
+```bash
+# Escape room tests
+npx playwright test tests/escape-room.spec.ts
 
-### Hamburger Menu (✔ Full Score: 3/3)
-✅ Hamburger menu on left side
+# Tabs builder tests
+npx playwright test tests/tabs.spec.ts
+```
 
-✅ Sidebar slide-in with CSS transform
+## 📊 Assignment 2 - Grading Criteria Fulfillment
+### Court Room or Escape Room (✔ Full Score: 7 / 7)
 
-✅ Accessible and clickable links
+#### Criteria:
+Create a Timer · Create appropriate icons/buttons · Have appropriate game play · Output is operational · Allow the user to generate multiple options · GitHub screenshot
 
-### Tabs Page (✔ Full Score: 6/6)
-✅ Add up to 15 tabs (+/- supported)
+- ✅ **Escape Room implemented** at `/escape-room`, with multiple stages/rooms and coding puzzles to solve.
 
-✅ Editable tab headings
+- ✅ **Manual set timer** per difficulty (easy/medium/hard) displayed in the escape HUD and driving game pressure.
 
-✅ Editable tab content (multiline supported)
+- ✅ **Icons/buttons** (eye, gear, door, save button, etc.) used for hints, puzzle connection, and room transitions, matching the escape-room theme.
 
-✅ Tabs stored in localStorage
+- ✅ **Background image** and visual styling give a clear “coding escape room” feel.
 
-✅ Preview and select functionality
+- ✅ **Gameplay is operational**: user can log in, start runs, solve rooms, progress through 6 rooms, and finish the game.
 
-### Output Button (✔ Full Score: 6/6)
-✅ Generates exportable HTML with only inline CSS
+- ✅ **Multiple options** via difficulty selection (`easy | medium | hard`) and multiple puzzles/rooms.
 
-✅ Copy to clipboard button
+- ✅ **GitHub history** shows multiple commits and feature iterations (screenshots to be provided in submission).
 
-✅ Open generated HTML in new tab
+### Dockerize (✔ Full Score: 3 / 3)
 
-✅ Supports 1, 3, 5+ tabs in demo
+#### Criteria:
+App runs in a Docker container.
 
-### GitHub (✔ Full Score: 3/3)
-✅ Several commits with history
+- ✅ **Dockerfile** (multi-stage) builds the Next.js app and Prisma client, and produces a production image exposing port `3000`.
 
-✅ Branch per feature (header-footer, theme-accessibility, tabs-builder)
+- ✅ `docker build -t cwa-assignment .` successfully builds the container image.
 
-✅ Main branch included
+- ✅ `docker run --rm -p 3000:3000 cwa-assignment` runs the app fully inside Docker; the app is reachable at `http://localhost:3000`.
 
-✅ node_modules excluded
+### APIs CRUD and Database (✔ Full Score: 8 / 8)
 
-✅ README updated with grading details
+#### Criteria:
+Create a Database Schema · Create CRUD APIs that access the Schema
 
-### 👉 Expected Total Score Achieved: 25 / 25
+- ✅ **Database schema** defined with **Prisma + SQLite** in `prisma/schema.prisma`, including models such as:
+    - `User` (authentication, profile)
+    - `SaveState` (escape room saves)
+    - `Session` / leaderboard-related entities (finished runs)
+
+- ✅ **Auth APIs**:
+    - `POST /api/auth/register` – create user
+    - `POST /api/auth/login` – login and set auth cookie
+    - `POST /api/auth/logout` – clear session
+
+- ✅ **User CRUD API**:
+    - `GET /api/users/me` – read current user
+    - `PUT /api/users/me` – update user fields (e.g. display name / password)
+    - `DELETE /api/users/me` – delete account (and associated data)
+
+- ✅ **SaveState CRUD (Escape Room saves**):
+    - `POST /api/save` – create/update (upsert) a save, used by the Save progress button
+    - `GET /api/save/latest` – read latest (unfinished) save per user
+    - `GET /api/save/history` – read full save history for a user
+    - (delete endpoints implemented as appropriate in the save routes)
+
+- ✅ **Leaderboard / Sessions APIs**:
+    - `GET /api/leaderboard?difficulty=...` – read leaderboard for each difficulty
+    - `POST /api/sessions` – record finished escape sessions
+
+- ✅ The **Escape Room UI** uses these APIs for:
+    - Saving progress to the DB
+    - Resuming previous runs
+    - Displaying leaderboards per difficulty.
+
+### Instrument Your App (✔ Full Score: 4 / 4)
+
+#### Criteria:
+Add Instrumentation · Video should demonstrate Playwright two tests · Lighthouse Report · Discussion of feedback
+
+- ✅ **Instrumentatio**n implemented in `src/lib/metrics.ts`:
+    - logEvent(event: MetricEvent, payload?: Record<string, unknown>)` logs structured events.
+    - `MetricEvent` includes events such as `user_register`, `user_login`, `save_progress`, `get_latest_save`, `get_save_history`, `session_finished`, `leaderboard_view`, etc.
+    - Events are written as `[METRIC] <timestamp> <event> <json>` to server logs for later analysis.
+
+- ✅ Instrumentation is called inside multiple API routes:
+    - Auth routes (login/register/logout)
+    - Save/load routes
+    - Leaderboard and sessions routes
+
+- ✅ **Playwright tests**:
+    - `tests/escape-room.spec.ts`: covers escape room flows (difficulty selection, solving rooms, save/resume behaviour, user lifecycle).
+    - `tests/tabs.spec.ts`: covers the tabs HTML generator (including multi-tab output).
+    - Tests are run via `npx playwright test` and will be demonstrated in the Assignment 2 video.
+
+- ✅ **Lighthouse**:
+    - Performance, Accessibility, Best Practices and SEO scores are obtained using Chrome DevTools Lighthouse against the deployed app.
+    - Screenshots of Lighthouse reports will be included in the submission and discussed in the video.
+
+- ✅ **Feedback & ethics**:
+    - Feedback has been gathered from **friends, family and industry** (tech lead & QA), including discussion of gameplay, UX, performance and educational value.
+    - The La Trobe ethical survey link has been shared with participants as requested.
+    - The video will include a discussion of this feedback and how it relates to accessibility, usability and ethical considerations.
+
+### Deploy on Cloud + Lambda Function (✔ Full Score: 3 / 3)
+
+#### Criteria:
+Deploy on the Cloud · Add Lambda function
+
+- ✅ **Cloud deployment**:
+    - The application is built into a Docker image and deployed to **Azure Container Apps**.
+    - Public escape room URL:
+    https://cwa-next-app.salmonsky-18cb5f22.southeastasia.azurecontainerapps.io/escape-room
+
+- ✅ **Serverless “lambda” function (Azure Function)**:
+    - Azure Function App created with Node runtime.
+    - HTTP-trigger function `Leaderboard` defined in `azure-function-leaderboard/Leaderboard`.
+    - Accessible at: 
+    https://cwa-leaderboard-fn6553.azurewebsites.net/api/leaderboard?difficulty=easy
+    - The function accepts a `difficulty` query parameter and generates **dynamic HTML** based on data from the main app’s `/api/leaderboard`.
+
+- ✅ **Integration with UI**:
+
+  - In `DifficultySelect.tsx`, the “Lambda leaderboard page” link uses the current `boardDifficulty`:
+  ```bash
+  href={`https://cwa-leaderboard-fn6553.azurewebsites.net/api/leaderboard?difficulty=${boardDifficulty}`}
+  ```
+
+This allows users to click from the React UI to an external serverless HTML page while keeping the data consistent with the in-app leaderboard.
+
+### 👉 Expected Assignment 2 Score Coverage
+
+- Court Room or Escape Room: **7 / 7**
+
+- Dockerize: **3 / 3**
+
+- APIs CRUD and Database: **8 / 8**
+
+- Instrument your app: **4 / 4**
+
+- Deploy on Cloud + Lambda: **3 / 3**
+
+#### Total Assignment 2: 25 / 25 (covered by implementation and deployment)
